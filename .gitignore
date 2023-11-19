@@ -2,4 +2,6 @@ emu_stuff/
 Sockets/src/bin
 Sockets/src/obj
 Sockets/BizHawk
-Sockets/src/.vs
+*.vs
+*.csproj.user
+*.sln
