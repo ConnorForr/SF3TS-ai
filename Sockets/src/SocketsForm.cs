@@ -33,6 +33,27 @@ namespace Net.MyStuff.Sockets
             ProtocolType.Tcp);
         Socket connection_socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
 
+        readonly IReadOnlyDictionary<string, Dictionary<string, bool>> default_input = new Dictionary<string, Dictionary<string, bool>> 
+            { 
+                {
+                    "Game Inputs", 
+                    new Dictionary<string, bool>
+                    {
+                
+                    } 
+                },
+
+
+                {
+                    "Control Inputs", 
+                    new Dictionary<string, bool>
+                    {
+                        {"Reset", false}
+                    } 
+                }
+            };
+
+        public static IReadOnlyDictionary<string, Dictionary<string, bool>>? inputs;
         public SocketsTool() 
         {
             ClientSize = new Size(480, 320);
@@ -49,22 +70,23 @@ namespace Net.MyStuff.Sockets
         public override void Restart()
         {
             // executed once after the constructor, and again every time a rom is loaded or reloaded
+            APIs.EmuClient.LoadState("KenVsRyu");
+            inputs = default_input;
         }
 
         protected override void UpdateBefore()
-        {   
-            int frame_count = APIs.Emulation.FrameCount()+1;
-            connection_socket.Send(Encoding.UTF8.GetBytes(frame_count.ToString()));
+        {    
+            int frame_count = APIs.Emulation.FrameCount();
             frame_counter_bytes.Text = frame_count.ToString();
+            
+            byte[] bytes = new byte[1024];
+            var received_bytes = connection_socket.Receive(bytes);
+            string json_input = Encoding.UTF8.GetString(bytes, 0, received_bytes);
+            inputs = JsonConvert.DeserializeObject<IReadOnlyDictionary<string,  Dictionary<string, bool>>>(json_input) ?? default_input;
 
-            /*if (frame_count % 2 == 0) {
-                byte[] bytes = new byte[1024];
-                var received_bytes = connection_socket.Receive(bytes);
-                string json_input = Encoding.UTF8.GetString(bytes, 0, received_bytes);
-                IReadOnlyDictionary<string, bool>? inputs = JsonConvert.DeserializeObject<IReadOnlyDictionary<string, bool>>(json_input);
-
-                APIs.Joypad.Set(inputs);
-            } */
+            if (frame_count % 5 == 0) {
+                APIs.Joypad.Set(inputs["Game Inputs"]);
+            } 
         }
 
         protected override void UpdateAfter()
@@ -101,12 +123,15 @@ namespace Net.MyStuff.Sockets
                 { "P2 X Coord", Convert.ToInt32(p2_x_coord) },
                 { "P1 Y Coord", Convert.ToInt32(p1_y_coord) },
                 { "P2 Y Coord", Convert.ToInt32(p2_y_coord) },
-                {"Frame Counter", APIs.Emulation.FrameCount()+1}
+                {"Frame Counter", APIs.Emulation.FrameCount()}
             };
             
             string message = JsonConvert.SerializeObject(game_data);
-
             connection_socket.Send(Encoding.UTF8.GetBytes(message));
+            
+            if (inputs?["Control Inputs"]["Reset"] ?? false) {
+                APIs.EmuClient.OpenRom(@"A:\Coding-Stuff\SF3TS-ai\Sockets\BizHawk\Arcade\sfiii3n.zip");
+            }
         }   
     }       
 }
