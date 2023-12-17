@@ -1,12 +1,16 @@
-import socket
-import sys
-import json
+import socket # socket import for socket server
+import json # json import for sending over sockets
+import gymnasium # gymnasium import for our environment
 import random
 
-
+# local host IP
 localhost = "127.0.0.1"
+
+# Port number
 port_number = 10305
 
+# All possible inputs to give BizHawk
+# (Missing some but those will never be used)
 inputs = ["P1 Forward Kick","P1 Roundhouse Kick","P1 Short Kick",
                 "P2 Forward Kick","P2 Short Kick","1 Player Start",
                 "2 Players Start","Coin 1","Coin 2","P1 Down",
@@ -15,6 +19,7 @@ inputs = ["P1 Forward Kick","P1 Roundhouse Kick","P1 Short Kick",
                 "P2 Jab Punch","P2 Left","P2 Right","P2 Roundhouse Kick",
                 "P2 Strong Punch","P2 Up"]
 
+# input dictionary we are sending to BizHawk (True = pressed; False = unpressed)
 new_inputs = {
                 "Game Inputs" : {"P1 Forward Kick" : False,"P1 Roundhouse Kick" : False,"P1 Short Kick" : False,
                 "P2 Forward Kick" : False,"P2 Short Kick" : False,"1 Player Start" : False,
@@ -27,13 +32,25 @@ new_inputs = {
                 "Control Inputs" : {"Reset" : False}
                 }
 
+
 def reset_check(p1_health, p2_health):
+    """
+    Function that checks if we need to reload the ROM to the savestate we want. We check when 
+    health = 255 since that's when a player has lost.
+    """
+
     if(p1_health == 255 or p2_health == 255):
         return True 
     else:
         return False 
-    
+
+
+# function for when we want to send
 def send_data():
+    """
+    Function for when we want to send data over the socket server. This will be sent once we generate new actions with 
+    the AI (receive state from BizHawk -> use to find next action -> send to BizHawk).
+    """
     for key, _ in new_inputs["Game Inputs"].items():
         new_inputs["Game Inputs"][key] = bool(random.getrandbits(1))
 
@@ -42,6 +59,9 @@ def send_data():
 
 
 def recv_data():
+    """
+    Function that will receive data. Just takes the returning inputs from BizHawk to be used for the AI.
+    """
     data = main_socket.recv(2048).strip()
     print(f"1: {data}")
     data_str = data.decode("utf-8")
@@ -54,27 +74,17 @@ def recv_data():
         new_inputs["Control Inputs"]["Reset"] = reset_check(player_data['P1 Health'], player_data['P2 Health'])
 
 
+# Main loop for the socket server.
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as main_socket:
+
+    # connects to the external tool's socket server.
     main_socket.connect((localhost, port_number))
     
-    restart = False
+    # infinite send receive loop
     while True:
         
-        print("sending...")
         send_data()        
-        print("sent")
-
-        print("waiting...")
+        
         recv_data()
-        print("done waiting")
+    
         
-
-        
-
- # {"P1 Forward Kick":false,"P1 Roundhouse Kick":false,"P1 Short Kick":false,
- # "P2 Forward Kick":false,"P2 Short Kick":false,"1 Player Start":false,
- # "2 Players Start":false,"Coin 1":false,"Coin 2":false,"P1 Down":false,
- # "P1 Fierce Punch":false,"P1 Jab Punch":false,"P1 Left":false,"P1 Right":false,
- # "P1 Strong Punch":false,"P1 Up":false,"P2 Down":false,"P2 Fierce Punch":false,
- # "P2 Jab Punch":false,"P2 Left":false,"P2 Right":false,"P2 Roundhouse Kick":false,
- # "P2 Strong Punch":false,"P2 Up":false,"Service 1":false,"Service Mode":false}
